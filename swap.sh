@@ -102,10 +102,11 @@ echo "🛠  开始优化Swap配置..."
     # 创建新Swap文件
     dd if=/dev/zero of="$SWAP_FILE" bs=1M count="$recommended_swap_mb" status=progress
     chmod 600 "$SWAP_FILE"
-    mkswap -p "$SWAP_PRIORITY" "$SWAP_FILE" >/dev/null
+    # 修改这里：移除了 -p 参数
+    mkswap "$SWAP_FILE" >/dev/null
     
-    # 启用新Swap
-    swapon "$SWAP_FILE"
+    # 启用新Swap并设置优先级
+    swapon -p "$SWAP_PRIORITY" "$SWAP_FILE"
     
     # 更新fstab配置
     grep -v "^$SWAP_FILE" /etc/fstab > /etc/fstab.tmp
