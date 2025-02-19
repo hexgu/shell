@@ -14,32 +14,45 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # 计算物理内存（单位：字节）
-read -r _ mem_total _ <<< "$(grep MemTotal /proc/meminfo)"
+mem_total=$(grep -i "memtotal" /proc/meminfo | awk '{print $2}')
 mem_total_bytes=$((mem_total * 1024))
 mem_gb=$((mem_total_bytes / (1024**3)))
 
 # 智能计算推荐Swap大小
 calculate_swap() {
+    local calculated_mb
     if (( mem_gb < 2 )); then
-        echo $((mem_total * 2 / 1024))    # 内存2倍（转换为MB）
+        calculated_mb=$((mem_total * 2 / 1024))    # 内存2倍（转换为MB）
     elif (( mem_gb <= 8 )); then
-        echo $((mem_total / 1024))        # 等于内存大小
+        calculated_mb=$((mem_total / 1024))        # 等于内存大小
     elif (( mem_gb <= 64 )); then
-        echo $((mem_total / 2 / 1024))    # 内存的50%
+        calculated_mb=$((mem_total / 2 / 1024))    # 内存的50%
     else
-        echo $MAX_SWAP_MB                 # 最大4GB
+        calculated_mb=$MAX_SWAP_MB                 # 最大4GB
+    fi
+
+    # 应用最小/最大限制
+    if (( calculated_mb < MIN_SWAP_MB )); then
+        echo "$MIN_SWAP_MB"
+    elif (( calculated_mb > MAX_SWAP_MB )); then
+        echo "$MAX_SWAP_MB"
+    else
+        echo "$calculated_mb"
     fi
 }
 
-# 应用最小/最大限制
+# 计算推荐的Swap大小
 recommended_swap_mb=$(calculate_swap)
-(( recommended_swap_mb = recommended_swap_mb < MIN_SWAP_MB ? MIN_SWAP_MB : recommended_swap_mb ))
-(( recommended_swap_mb = recommended_swap_mb > MAX_SWAP_MB ? MAX_SWAP_MB : recommended_swap_MB ))
 
 # 获取当前Swap信息
-mapfile -t swap_list < <(swapon --show=name,size --bytes --noheadings)
-current_swap_total=$(printf '%s\n' "${swap_list[@]}" | awk '{sum+=$2} END{print sum}')
-swap_target=$(printf '%s\n' "${swap_list[@]}" | awk -v target="$SWAP_FILE" '$1 == target {print $2}')
+mapfile -t swap_list < <(swapon --show=name,size --bytes --noheadings 2>/dev/null || echo)
+current_swap_total=0
+swap_target=0
+
+if [[ ${#swap_list[@]} -gt 0 ]]; then
+    current_swap_total=$(printf '%s\n' "${swap_list[@]}" | awk '{sum+=$2} END{print sum}')
+    swap_target=$(printf '%s\n' "${swap_list[@]}" | awk -v target="$SWAP_FILE" '$1 == target {print $2}')
+fi
 
 # 判断是否需要调整
 needs_recreate() {
@@ -67,7 +80,12 @@ fi
 
 # 交互确认
 echo "⚠️ 当前Swap配置："
-printf '%s\n' "${swap_list[@]}" | awk '{printf "  - %s: %dMB\n", $1, $2/1024/1024}'
+if [[ ${#swap_list[@]} -gt 0 ]]; then
+    printf '%s\n' "${swap_list[@]}" | awk '{printf "  - %s: %dMB\n", $1, $2/1024/1024}'
+else
+    echo "  - 无Swap配置"
+fi
+
 read -p "是否调整Swap配置？(y/N) " -n 1 -r
 echo
 [[ $REPLY =~ ^[Yy]$ ]] || exit 0
@@ -76,7 +94,7 @@ echo
 echo "🛠  开始优化Swap配置..."
 {
     # 禁用所有Swap
-    swapoff -a
+    swapoff -a 2>/dev/null || true
     
     # 清理旧Swap文件
     [[ -f "$SWAP_FILE" ]] && rm -f "$SWAP_FILE"
