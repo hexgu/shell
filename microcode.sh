@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2021-2024 tteck
+# Copyright (c) 2021-2025 tteck
 # Author: tteck (tteckster)
 # License: MIT
 # https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
@@ -60,7 +60,7 @@ intel() {
   [ -z "$microcode" ] && { whiptail --backtitle "Proxmox VE Helper Scripts" --title "No Microcode Selected" --msgbox "It appears that no microcode packages were selected" 10 68; msg_info "Exiting"; sleep 1; msg_ok "Done"; exit; }
 
   msg_info "Downloading the Intel Processor Microcode Package $microcode"
-  wget -q http://mirrors.cernet.edu.cn/debian/pool/non-free-firmware/i/intel-microcode/$microcode
+  wget -q https://mirrors.cernet.edu.cn/debian/pool/non-free-firmware/i/intel-microcode/$microcode
   msg_ok "Downloaded the Intel Processor Microcode Package $microcode"
 
   msg_info "Installing $microcode (Patience)"
