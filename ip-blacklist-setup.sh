@@ -30,14 +30,14 @@ error() {
 
 # 检查是否为root用户
 check_root() {
-    if [[ $EUID -ne 0 ]]; 键，然后
+    if [[ $EUID -ne 0 ]]; then
         error "此脚本需要root权限运行，请使用 sudo $0"
     fi
 }
 
 # 检查包管理器
 check_package_manager() {
-    if command -v aptitude &> /dev/null; 键，然后
+    if command -v aptitude &> /dev/null; then
         PKG_MANAGER="aptitude"
         log "使用 aptitude 作为包管理器"
     elif command -v apt-get &> /dev/null; then
@@ -232,7 +232,7 @@ setup_cron() {
     log "设置定时任务..."
     
     # 检查是否已存在相同的定时任务
-    if crontab -l 2>/dev/null | grep -q "$CRON_SCRIPT"; 键，然后
+    if crontab -l 2>/dev/null | grep -q "$CRON_SCRIPT"; then
         log "定时任务已存在"
         return
     fi
@@ -249,7 +249,7 @@ setup_cron() {
 # 初始化更新黑名单
 initial_update() {
     log "执行初始黑名单更新..."
-    if bash "$CRON_SCRIPT"; 键，然后
+    if bash "$CRON_SCRIPT"; then
         log "初始黑名单更新成功"
     else
         warn "初始黑名单更新失败，请检查网络连接"
