@@ -1,10 +1,4 @@
 #!/bin/bash
-
-# IP黑名单自动屏蔽系统安装脚本
-# 作者: JarryZheng
-# 日期: 2025-08-04
-# 功能: 自动安装依赖、配置ipset+iptables、设置定时任务
-
 set -e
 
 # 配置变量
