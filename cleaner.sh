@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-VERSION="2026.04-fixed"
+VERSION="2026.04-final"
 
 export DEBIAN_FRONTEND=noninteractive
 export APT_LISTCHANGES_FRONTEND=none
@@ -17,6 +17,7 @@ USER_CACHE_DAYS="${USER_CACHE_DAYS:-14}"
 SERVICE_CACHE_DAYS="${SERVICE_CACHE_DAYS:-7}"
 JOURNAL_TIME="${JOURNAL_TIME:-7d}"
 JOURNAL_SIZE="${JOURNAL_SIZE:-256M}"
+COMMAND_TIMEOUT="${COMMAND_TIMEOUT:-180}"
 
 APT_OPTS=(
   -y
@@ -83,11 +84,26 @@ quote_cmd() {
 
 try() {
   log RUN "$(quote_cmd "$@")"
-  "$@" >> "$LOG_FILE" 2>&1 || {
-    local code=$?
-    log WARN "命令失败但已跳过，退出码 ${code}：$(quote_cmd "$@")"
-    return 0
-  }
+
+  if command_exists timeout; then
+    timeout --kill-after=10s "$COMMAND_TIMEOUT" "$@" >> "$LOG_FILE" 2>&1 < /dev/null || {
+      local code=$?
+
+      if [[ "$code" -eq 124 || "$code" -eq 137 ]]; then
+        log WARN "命令超时已跳过：$(quote_cmd "$@")"
+      else
+        log WARN "命令失败但已跳过，退出码 ${code}：$(quote_cmd "$@")"
+      fi
+
+      return 0
+    }
+  else
+    "$@" >> "$LOG_FILE" 2>&1 < /dev/null || {
+      local code=$?
+      log WARN "命令失败但已跳过，退出码 ${code}：$(quote_cmd "$@")"
+      return 0
+    }
+  fi
 }
 
 used_bytes() {
@@ -128,7 +144,7 @@ init_runtime() {
   flock -n 9 || die "已有一个清理任务正在运行"
 
   log STEP "Debian Deep Clean ${VERSION}"
-  log STEP "一键清理开始"
+  log STEP "一键清理开始 (单命令超时限制: ${COMMAND_TIMEOUT}s)"
   log WARN "Docker 数据卷不会被清理"
 }
 
@@ -468,15 +484,15 @@ cleanup_language_caches() {
   fi
 
   if command_exists pip; then
-    try pip cache purge
+    try pip --no-input cache purge
   fi
 
   if command_exists pip3; then
-    try pip3 cache purge
+    try pip3 --no-input cache purge
   fi
 
   if command_exists python3; then
-    try python3 -m pip cache purge
+    try python3 -m pip --no-input cache purge
   fi
 
   if command_exists composer; then
